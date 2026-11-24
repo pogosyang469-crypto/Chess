@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Шотландская партия</title>
+<style>
+  :root {
+    --bg: #f4efe6; --fg: #2b2620; --muted: #7a6f60; --card: #fffaf2;
+    --light: #f0d9b5; --dark: #b58863; --hl: rgba(255, 214, 64, .55);
+    --accent: #8a4b1f; --border: #d8cbb6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1b1916; --fg: #ece5d8; --muted: #a59a88; --card: #25221e;
+      --border: #3b352e; --accent: #e0a56f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1b1916; --fg: #ece5d8; --muted: #a59a88; --card: #25221e;
+    --border: #3b352e; --accent: #e0a56f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; justify-content: center; padding: 24px 16px;
+  }
+  .wrap { width: 100%; max-width: 1040px; display: grid; gap: 24px;
+          grid-template-columns: minmax(0, 600px) minmax(0, 1fr); align-items: start; }
+  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } }
+  h1 { margin: 0 0 4px; font-size: 26px; }
+  .sub { color: var(--muted); margin: 0 0 12px; font-size: 14px; }
+
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+  .tab { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border);
+         background: var(--card); color: var(--fg); cursor: pointer; font: inherit; font-size: 14px; }
+  .tab.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .stage { display: flex; gap: 10px; align-items: stretch; }
+  .evalbar { position: relative; width: 28px; flex: 0 0 28px; border-radius: 4px; overflow: hidden;
+             background: #403d39; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+  .evalbar .white { position: absolute; left: 0; right: 0; bottom: 0; background: #f4f4f1;
+                    height: 50%; transition: height 700ms cubic-bezier(.45,.05,.25,1); }
+  .evalbar .num { position: absolute; left: 0; right: 0; text-align: center; font-size: 10px;
+                  font-weight: 700; z-index: 1; }
+  .evalbar .num.bottom { bottom: 4px; color: #403d39; }
+  .evalbar .num.top { top: 4px; color: #f4f4f1; }
+
+  .board-box { position: relative; flex: 1; aspect-ratio: 1; border-radius: 6px;
+               overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+  .squares { position: absolute; inset: 0; display: grid;
+             grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); }
+  .sq { position: relative; }
+  .sq.l { background: var(--light); } .sq.d { background: var(--dark); }
+  .sq.hl::after { content: ""; position: absolute; inset: 0; background: var(--hlc, var(--hl)); }
+  .coord { position: absolute; font-size: clamp(8px, 1.8vw, 12px); font-weight: 600; z-index: 1; }
+  .sq.l .coord { color: var(--dark); } .sq.d .coord { color: var(--light); }
+  .coord.f { right: 3px; bottom: 1px; } .coord.r { left: 3px; top: 1px; }
+
+  .pieces { position: absolute; inset: 0; pointer-events: none; }
+  .pc { position: absolute; width: 12.5%; height: 12.5%; display: flex;
+        align-items: center; justify-content: center; line-height: 1;
+        font-size: min(9vw, 58px);
+        transition: transform var(--dur, 600ms) cubic-bezier(.45,.05,.25,1), opacity 300ms;
+        z-index: 2; }
+  .pc.moving { z-index: 3; }
+  .pc.w { color: #fff; text-shadow: 0 0 1px #000, 0 0 1px #000, 0 0 1px #000, 0 2px 3px rgba(0,0,0,.4); }
+  .pc.b { color: #1a1a1a; text-shadow: 0 0 1px #000, 0 2px 3px rgba(0,0,0,.35); }
+  .pc.gone { opacity: 0; }
+  svg.arrows { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 4; pointer-events: none; }
+
+  /* значок оценки на клетке, как на chess.com */
+  .sqbadge { position: absolute; width: 12.5%; height: 12.5%; z-index: 5; pointer-events: none;
+             transition: transform 0ms; }
+  .sqbadge .badge { position: absolute; right: -6%; top: -6%; width: 42%; height: 42%;
+                    font-size: min(2.6vw, 15px); box-shadow: 0 2px 4px rgba(0,0,0,.35);
+                    animation: pop 300ms ease-out; }
+  @keyframes pop { from { transform: scale(0); } to { transform: scale(1); } }
+
+  .badge { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%;
+           color: #fff; font-weight: 800; line-height: 1; letter-spacing: -.5px;
+           width: 20px; height: 20px; font-size: 11px; flex: 0 0 auto; }
+
+  .controls { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
+  button { font: inherit; padding: 9px 14px; border-radius: 8px; border: 1px solid var(--border);
+           background: var(--card); color: var(--fg); cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); min-width: 110px; }
+  label { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; margin-left: auto; }
+
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+  .chances { display: flex; height: 26px; border-radius: 6px; overflow: hidden; font-size: 12px;
+             font-weight: 700; margin-bottom: 14px; border: 1px solid var(--border); }
+  .chances div { display: flex; align-items: center; padding: 0 8px; white-space: nowrap;
+                 transition: flex-basis 700ms cubic-bezier(.45,.05,.25,1); overflow: hidden; }
+  .chances .cw { background: #f4f4f1; color: #403d39; }
+  .chances .cb { background: #403d39; color: #f4f4f1; justify-content: flex-end; }
+  .comment { min-height: 130px; font-size: 15px; line-height: 1.5; }
+  .head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+  .head .san { color: var(--accent); font-size: 18px; font-weight: 700; }
+  .head .cls { font-weight: 700; font-size: 14px; }
+  .head .ev { margin-left: auto; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .bestline { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .moves { margin-top: 14px; max-height: 300px; overflow-y: auto; position: relative; align-content: start;
+           overscroll-behavior: contain; display: grid; grid-template-columns: 30px 1fr 1fr; gap: 2px 6px; font-size: 15px; }
+  .moves .n { color: var(--muted); padding-top: 3px; }
+  .mv { padding: 3px 6px; border-radius: 5px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+  .mv .badge { width: 16px; height: 16px; font-size: 9px; }
+  .mv:hover { background: rgba(138,75,31,.12); }
+  .mv.cur { background: var(--accent); color: #fff; }
+  .legend { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 13px;
+            color: var(--muted); }
+  .legend span { display: flex; align-items: center; gap: 6px; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 14px; line-height: 1.45; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <h1>Шотландская партия</h1>
+    <p class="sub" id="sub"></p>
+    <div class="tabs" id="tabs"></div>
+    <div class="stage">
+      <div class="evalbar" title="Оценка позиции">
+        <div class="white" id="barW"></div>
+        <div class="num" id="barNum"></div>
+      </div>
+      <div class="board-box" id="board">
+        <div class="squares" id="squares"></div>
+        <div class="pieces" id="pieces"></div>
+        <svg class="arrows" id="arrows" viewBox="0 0 8 8">
+          <defs><marker id="ah" markerWidth="3" markerHeight="3" refX="1.6" refY="1.5" orient="auto">
+            <path d="M0,0 L3,1.5 L0,3 z" fill="rgba(20,120,60,.85)"/></marker></defs>
+        </svg>
+        <div class="sqbadge" id="sqbadge"></div>
+      </div>
+    </div>
+    <div class="controls">
+      <button id="reset" title="В начало">⏮</button>
+      <button id="prev" title="Назад">◀</button>
+      <button id="play" class="primary">▶ Играть</button>
+      <button id="next" title="Вперёд">▶</button>
+      <label>Скорость
+        <select id="speed">
+          <option value="3000">медленно</option>
+          <option value="1900" selected>норм</option>
+          <option value="1000">быстро</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="chances" title="Шансы на победу">
+      <div class="cw" id="cw"></div><div class="cb" id="cb"></div>
+    </div>
+    <div class="comment" id="comment"></div>
+    <div class="moves" id="moves"></div>
+    <div class="legend" id="legend"></div>
+    <p class="note">Оценки сделал Stockfish 16 на глубине 20. Классификация по системе chess.com считается по тому,
+      сколько процентов шанса на победу теряет ход по сравнению с лучшим ходом движка. Ходы теории помечены как «Теория». После дебюта партии доиграны до мата: ходы на уровне 2500 Эло (Stockfish с ограничением силы), а уже выигранную позицию реализует полная сила движка.
+      Клик по ходу перейдёт к позиции, ещё работают стрелки ← →, а пробел запускает и ставит на паузу.</p>
+  </div>
+</div>
+
+<script>
+const GLYPH = { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" };
+const START = ["rnbqkbnr","pppppppp","........","........","........","........","PPPPPPPP","RNBQKBNR"];
+const START_CP = 30;  // оценка начальной позиции
+
+// Классы оценок как на chess.com
+const CLS = {
+  brilliant:  { sym: "!!", color: "#1baca6", name: "Блестящий" },
+  great:      { sym: "!",  color: "#5c8bb0", name: "Отличный" },
+  best:       { sym: "★",  color: "#81b64c", name: "Лучший" },
+  excellent:  { sym: "👍︎", color: "#96bc4b", name: "Превосходно" },
+  good:       { sym: "✓",  color: "#95af8a", name: "Хороший" },
+  book:       { sym: "📖︎", color: "#a88865", name: "Теория" },
+  inaccuracy: { sym: "?!", color: "#f7c631", name: "Неточность" },
+  mistake:    { sym: "?",  color: "#ffa459", name: "Ошибка" },
+  blunder:    { sym: "??", color: "#fa412d", name: "Зевок" }
+};
+
+const COMMON = [
+  ["e4",   "Белые сразу занимают центр королевской пешкой и открывают диагонали для ферзя и слона."],
+  ["e5",   "Чёрные отвечают симметрично, это классическое открытое начало."],
+  ["Nf3",  "Конь развивается с темпом и атакует пешку e5."],
+  ["Nc6",  "Самая естественная защита пешки e5, заодно с развитием."],
+  ["d4",   "Вот она, шотландская партия! Белые сразу вскрывают центр и не дают чёрным спокойно развиться, в отличие от испанской или итальянской."],
+  ["exd4", "Чёрные берут: держать центр пешкой e5 уже не получится."],
+  ["Nxd4", "Белые отыгрывают пешку конём, получают свободную игру и пространство в центре."]
+];
+
+const VARIANTS = {
+  mieses: {
+    tab: "4...Nf6 — вариант Мизеса",
+    sub: "1.e4 e5 2.Nf3 Nc6 3.d4 exd4 4.Nxd4 Nf6 5.Nxc6 — играем за белых",
+    book: 17,
+    mate: true,
+    moves: [...COMMON,
+      ["Nf6",  "Самый популярный ответ: чёрные атакуют пешку e4 и развивают фигуру."],
+      ["Nxc6", "Начинается вариант Мизеса: белые меняются на c6, чтобы испортить чёрным пешечную структуру."],
+      ["bxc6", "Чёрные берут к центру. Пешки сдвоены, зато открылась линия «b»."],
+      ["e5",   "Темп! Пешка гонит коня f6 и отбирает у чёрных поля d6 и f6."],
+      ["Qe7",  "Чёрные связывают пешку e5 и сразу давят на неё."],
+      ["Qe2",  "Ферзь защищает пешку и встаёт напротив ферзя соперника."],
+      ["Nd5",  "Конь уходит в центр: поле красивое, но шаткое."],
+      ["c4",   "Белые продолжают гнать коня и забирают ещё больше пространства."],
+      ["Ba6",  "Хитрость: слон связывает пешку c4 с ферзём e2, поэтому конь d5 пока в безопасности."],
+      ["b3",   "Белые укрепляют пешку c4 и готовят Bb2. Это главная позиция варианта Мизеса."],
+      ["g6",   "Чёрные готовят фианкетто, слон g7 будет давить на пешку e5."],
+      ["g3",   "Белые тоже ставят слона на большую диагональ, чтобы он смотрел на c6 и d5. Движок чуть больше любит Nd2."],
+      ["Bg7",  "Слон встаёт на g7 и атакует e5."],
+      ["Bb2",  "Единственный ход, который держит равенство: слон защищает пешку e5, иначе она просто падает."],
+      ["O-O",  "Король уходит в безопасность, ладья f8 подключается к игре."],
+      ["Bg2",  "Белые завершают фианкетто, теперь слон g2 давит на коня d5 и пешку c6."],
+      ["Rae8", "Ладья встаёт напротив короля и ферзя по линии «e», давление на e5 растёт."],
+      ["O-O",  "Белые рокируют, все фигуры почти развиты."],
+      ["f6",   "Ошибка! Чёрные хотят вскрыть линию «f», но упускают тактику. Надо было 13...Bxe5 и сохранять равенство."],
+      ["Qd2",  "Отличный ход! Ферзь уходит из-под связки по диагонали a6–f1. Пешка c4 развязана, и теперь cxd5 выигрывает коня."],
+      ["fxe5", "Чёрные идут на обострение. Сохранить коня всё равно нельзя."],
+      ["cxd5", "Белые забирают коня."],
+      ["Bxf1", "Слон берёт ладью f1, так что чёрные отыгрывают часть материала."],
+      ["Bxf1", "Белые возвращают слона. Итог размена: у белых лишняя фигура против пешек."],
+      ["e4",   "Чёрные гонят проходную вперёд. Точнее было 16...cxd5."],
+      ["dxc6", "Белые создают свою проходную, пешка c6 очень опасна."],
+      ["e3",   "Чёрные пытаются вскрыть позицию короля белых."],
+      ["Bc4+", "Отличный ход! Шах с темпом, слон выходит на активную диагональ a2–g8."],
+      ["Kh8",  "Единственное отступление короля."],
+      ["fxe3", "Белые уничтожают опасную пешку. Лишняя фигура и проходная c6 дают им явный перевес, оценка около +1.8. Дальше эндшпиль."],
+      ["Qxe3+", "Чёрные забирают пешку с шахом и предлагают размен ферзей."],
+      ["Qxe3", "Белые меняют ферзей: с лишней фигурой эндшпиль им только на руку."],
+      ["Rxe3", "Ладья забирает ферзя и врывается на третью горизонталь."],
+      ["Bxg7+", "Размен слонов с шахом убирает главного защитника чёрного короля."],
+      ["Kxg7", "Вынужденное взятие."],
+      ["Na3", "Последняя фигура белых выходит в игру."],
+      ["Re7", "Ошибка. Ладья уходит пассивно, а надо было сразу 22...dxc6 и отыграть пешку."],
+      ["Nb5", "Отличный ход! Конь прыгает на b5 и нападает на пешки a7 и c7."],
+      ["Rf6", "Ладья выходит на шестую горизонталь и нападает на пешку c6."],
+      ["Nxa7", "Конь забирает пешку a7. У белых лишняя фигура и проходная пешка «a»."],
+      ["dxc6", "Чёрные наконец забирают пешку c6."],
+      ["Rf1", "Ладья занимает открытую линию «f». Движок чуть больше хотел сразу a4."],
+      ["Rd7", "Ладья переходит на открытую линию «d»."],
+      ["a4", "Проходная «a» двинулась вперёд, и это главный козырь белых."],
+      ["Rfd6", "Чёрные сдваивают ладьи по линии «d» и ищут контригру."],
+      ["Rf2", "Ладья прикрывает вторую горизонталь от вторжения. Точнее было сразу a5."],
+      ["g5", "Чёрные двигают пешки королевского фланга."],
+      ["Kg2", "Король подтягивается ближе к центру."],
+      ["h5", "Чёрные продолжают пешечное наступление на королевском фланге."],
+      ["a5", "Пешка «a» идёт дальше."],
+      ["g4", "Пешка на g4 отнимает у белых поля f3 и h3."],
+      ["Nc8", "Конь возвращается в игру и нападает на ладью d6."],
+      ["Rd4", "Ладья уходит из-под удара и атакует слона c4."],
+      ["Be6", "Слон уходит с темпом и нападает на ладью d7."],
+      ["R7d5", "Ошибка! Чёрные отдают качество: слон бьёт ладью d5, а взамен они получают только слона. Лучше было 30...Rd8."],
+      ["Bxd5", "Белые с удовольствием забирают ладью."],
+      ["Rxd5", "Чёрные возвращают слона, но у белых теперь ладья и конь против ладьи."],
+      ["Ra2", "Ладья встаёт за проходную пешку, это классика эндшпиля."],
+      ["Rd8", "Ладья нападает на коня c8."],
+      ["Ne7", "Конь уходит с темпом и нацеливается на пешку c6."],
+      ["Rd7", "Ладья нападает на коня e7."],
+      ["Nxc6", "Конь съедает пешку c6, белые убирают последнюю пешку ферзевого фланга у чёрных."],
+      ["Rd6", "Ладья атакует коня c6."],
+      ["Rc2", "Ладья защищает коня. Движок предпочитал увести коня на e5."],
+      ["Kg6", "Король чёрных идёт на помощь своим пешкам."],
+      ["a6", "Проходная уже на шестой горизонтали."],
+      ["Rd1", "Ладья уходит в тыл белым и ищет шахи."],
+      ["Ra2", "Ладья снова встаёт за проходную."],
+      ["Rd6", "Ладья пытается вернуться, но поздно: пешку уже не остановить."],
+      ["a7", "Пешка в шаге от превращения."],
+      ["Rd5", "Чёрным уже нечем остановить пешку."],
+      ["a8=Q", "Пешка превращается в ферзя! Дальше движок видит форсированный мат."],
+      ["Kf7", "Король пытается уйти в центр."],
+      ["Nd8+", "Шах конём! Он отвлекает ладью чёрных с пятой горизонтали."],
+      ["Rxd8", "Чёрные берут коня, но ладья теперь стоит под ударом ферзя."],
+      ["Rf2+", "Шах ладьёй, король отрезан от центра."],
+      ["Kg6", "Король отступает."],
+      ["Qxd8", "Ферзь забирает ладью. У чёрных остались только пешки."],
+      ["h4", "Ход отчаяния, защищаться уже нечем."],
+      ["Qg8+", "Ферзь гонит короля к краю доски."],
+      ["Kh6", "Король уходит на h6."],
+      ["Rf6+", "Ладья даёт шах и отрезает королю шестую горизонталь."],
+      ["Kh5", "Последнее отступление."],
+      ["Qd5#", "МАТ! Ферзь бьёт по пятой горизонтали и держит g5, ладья f6 закрывает g6 и h6, а поля g4 и h4 заняты своими же пешками. Белые реализовали лишнюю фигуру."]
+    ]
+  },
+  bc5: {
+    tab: "4...Bc5 — классика",
+    sub: "1.e4 e5 2.Nf3 Nc6 3.d4 exd4 4.Nxd4 Bc5 5.Be3 — играем за белых",
+    book: 16,
+    mate: true,
+    moves: [...COMMON,
+      ["Bc5",  "Классический вариант: слон сразу атакует коня d4."],
+      ["Be3",  "Белые защищают коня и встречают слона слоном."],
+      ["Qf6",  "Чёрные усиливают давление на d4, теперь коня атакуют уже дважды."],
+      ["c3",   "Пешка надёжно укрепляет коня d4 и даёт ферзю поле b3."],
+      ["Nge7", "Конь идёт на e7, а не на f6, чтобы не мешать ферзю."],
+      ["Bc4",  "Белые развивают слона на активную диагональ и смотрят на f7."],
+      ["Ne5",  "Конь атакует слона c4 и занимает сильное центральное поле."],
+      ["Be2",  "Слон отступает, но не на b3, а на e2: поле g4 под контролем, а слон защищает короля."],
+      ["Qg6",  "Ферзь переходит на королевский фланг и атакует g2 и e4."],
+      ["O-O",  "Белые рокируют, король в безопасности, ладья подключается."],
+      ["d6",   "Чёрные открывают слона c8 и укрепляют коня e5."],
+      ["f3",   "Пешка закрывает ферзю чёрных диагональ на g2 и намертво держит e4."],
+      ["O-O",  "Чёрные тоже прячут короля."],
+      ["Kh1",  "Профилактика: король уходит с диагонали g1–a7, где стоит слон c5. Движок чуть больше любит сразу Nd2."],
+      ["f5",   "Чёрные начинают атаку пешками на королевском фланге."],
+      ["Nd2",  "Конь развивается и идёт на c4, чтобы разменять сильного коня e5."],
+      ["f4",   "Пешка атакует слона e3 и захватывает пространство."],
+      ["Bg1",  "Слон отступает, но держит важную диагональ g1–a7 против слона c5."],
+      ["a6",   "Чёрные заранее освобождают слону поле a7."],
+      ["Nc4",  "Белые предлагают размен коня e5. Позиция примерно равная, у обеих сторон есть игра."],
+      ["Qf6", "Ферзь возвращается на f6 и защищает коня e5 от удара коня c4. Движок предпочитал 14...Kh8."],
+      ["b4", "Пешка гонит слона c5."],
+      ["Bxd4", "Неточность. Чёрные отдают сильного слона за коня, лучше было 15...Ba7."],
+      ["cxd4", "Белые берут к центру, и пешка d4 нападает на коня e5."],
+      ["N5g6", "Конь отступает на g6."],
+      ["Rc1", "Ладья занимает полуоткрытую линию «c». Движок хотел сразу d5."],
+      ["Nh4", "Неточность. Конь уходит на край, а лучше было 17...d5."],
+      ["d5", "Белые захватывают пространство в центре."],
+      ["b5", "Чёрные нападают на коня c4."],
+      ["Nd2", "Неточность. Конь отступает, а сильнее было 19.Na5."],
+      ["a5", "Неточность. Чёрные вскрывают линию «a», но лучше было 19...Rf7."],
+      ["bxa5", "Белые берут пешку."],
+      ["Rxa5", "Ладья отыгрывает пешку и выходит в игру."],
+      ["Rc2", "Ладья прикрывает вторую горизонталь. Движок предпочитал 21.Nb3."],
+      ["Nxg2", "Неточность. Чёрные жертвуют коня на g2 ради атаки на короля, но жертва некорректна. Лучше было 21...Ng6."],
+      ["Nb3", "Хладнокровно! Белые не спешат брать коня и сначала нападают на ладью a5."],
+      ["Bf5", "Неточность. Чёрные отдают ещё и слона, чтобы вскрыть позицию белого короля. Лучше было 22...Ra4."],
+      ["Kxg2", "Король забирает коня."],
+      ["Raa8", "Ладья отступает из-под удара."],
+      ["exf5", "Белые забирают и слона. Теперь у них две лишние фигуры за пешку."],
+      ["Qh4", "Ферзь врывается на h4 и подбирается к королю белых."],
+      ["Bxb5", "Слон забирает пешку b5."],
+      ["Qh5", "Ферзь нападает на пешку f5."],
+      ["Nd4", "Конь надёжно защищает пешку f5 и встаёт в центр."],
+      ["Kh8", "Король уходит в угол."],
+      ["Kh1", "Король уходит с открытой линии «g»."],
+      ["Rxf5", "Чёрные всё-таки берут пешку f5, начинается серия разменов."],
+      ["Rxc7", "Белые в ответ забирают пешку c7 и нападают на коня e7."],
+      ["Nxd5", "Конь берёт пешку d5 и атакует ладью c7."],
+      ["Nxf5", "Конь забирает ладью f5."],
+      ["Nxc7", "Чёрные забирают ладью c7. После разменов у белых по-прежнему две лишние фигуры."],
+      ["Bc6", "Слон нападает на ладью a8."],
+      ["Rd8", "Ладья уходит."],
+      ["Be4", "Слон возвращается в центр."],
+      ["d5", "Чёрные двигают пешку и нападают на слона e4."],
+      ["Bd3", "Слон отступает."],
+      ["Re8", "Ладья выходит на открытую линию «e»."],
+      ["Qc2", "Ферзь белых вступает в игру и нацеливается на коня c7."],
+      ["Ne6", "Конь уходит из-под удара."],
+      ["Qc6", "Ферзь нападает на ладью e8 и пешку d5."],
+      ["Nd8", "Конь нападает на ферзя."],
+      ["Qxd5", "Ферзь уходит с темпом и забирает пешку d5."],
+      ["Qf7", "Чёрные предлагают размен ферзей."],
+      ["Qxf7", "Белые охотно меняются: с двумя лишними фигурами эндшпиль выигран."],
+      ["Nxf7", "Вынужденное взятие."],
+      ["Bd4", "Слон выходит на большую диагональ и нацеливается на g7."],
+      ["h6", "Чёрные ослабляют позицию короля, лучше было 36...Kg8."],
+      ["Bxg7+", "Слон берёт пешку g7 с шахом."],
+      ["Kg8", "Король отступает."],
+      ["Rg1", "Ладья встаёт за слоном g7, и теперь любой ход слоном даст вскрытый шах."],
+      ["Ng5", "Конь закрывается от вскрытого шаха."],
+      ["Bxh6", "Слон забирает пешку h6 и снова нападает на коня g5."],
+      ["Kf7", "Король бежит к центру."],
+      ["Bxg5", "Белые забирают коня. У чёрных осталась одна ладья и пешка."],
+      ["Ke6", "Король пытается спрятаться в центре."],
+      ["Re1+", "Шах ладьёй, и движок уже видит форсированный мат."],
+      ["Kd7", "Король отступает."],
+      ["Bb5+", "Ещё шах: слон гонит короля."],
+      ["Kc7", "Король бежит на ферзевый фланг."],
+      ["Bxe8", "Слон забирает ладью. У чёрных остались только король и пешка."],
+      ["Kb6", "Король уходит от слонов."],
+      ["Bd8+", "Шах слоном, король уходит всё дальше к краю."],
+      ["Kb7", "Король отступает."],
+      ["Nd6+", "Конь даёт шах и закрывает королю поля c8 и b5."],
+      ["Ka6", "Король уходит в угол."],
+      ["Bc7", "Тихий ход! Слон закрывает королю поле b6."],
+      ["Ka7", "Король отступает."],
+      ["Re4", "Ладья готовит мат по линии «a»."],
+      ["Ka6", "Других ходов нет."],
+      ["Ra4#", "МАТ! Ладья даёт шах по линии «a», b5 и b7 держит конь d6, а b6 — слон c7. Белые выиграли с двумя лишними фигурами."]
+    ]
+  },
+  goring: {
+    tab: "4.c3 — гамбит Гёринга",
+    sub: "1.e4 e5 2.Nf3 Nc6 3.d4 exd4 4.c3 — жертва пешки и мат Легаля",
+    book: 9,
+    brilliant: [14],
+    mate: true,
+    moves: [...COMMON.slice(0, 6),
+      ["c3",   "Гамбит Гёринга! Вместо взятия на d4 белые жертвуют пешку ради быстрого развития и атаки."],
+      ["dxc3", "Чёрные принимают жертву."],
+      ["Nxc3", "Конь забирает пешку и выходит в игру. Белые отдали пешку, зато у них уже две развитые фигуры и открытые линии."],
+      ["d6",   "Солидно, но пассивно. Движок предпочитает активное 5...Bc5."],
+      ["Bc4",  "Слон нацеливается на самую слабую точку чёрных, пешку f7."],
+      ["Bg4",  "Неточность. Слон связывает коня f3 с ферзём, и чёрным кажется, что конь теперь не может сдвинуться. Это ловушка."],
+      ["O-O",  "Белые спокойно рокируют. Движок предлагал Qb3 с ударом по f7 и b7, но рокировка тоже держит инициативу."],
+      ["Ne5",  "Зевок! Чёрные атакуют слона c4 и верят, что конь f3 связан. Надо было 7...Nf6."],
+      ["Nxe5", "Блестящий ход! Белые жертвуют ферзя: «связанный» конь всё равно прыгает. Это знаменитый мат Легаля."],
+      ["Bxd1", "Ошибка! Чёрные жадно берут ферзя, и это уже мат в 2 хода. После 8...dxe5 9.Qxg4 они остались бы без фигуры, но мата бы не было."],
+      ["Bxf7+","Шах! Слон врывается на f7, и королю приходится отступать."],
+      ["Ke7",  "Единственный ход."],
+      ["Nd5#", "МАТ! Конь d5 даёт шах, а все поля вокруг короля закрыты: d7 держит конь e5, e8 и e6 держит слон f7, f6 держит конь d5. Взять слона f7 нельзя, его защищает конь e5. Белые выиграли без ферзя!"]
+    ]
+  }
+};
+
+const EVALS = {"mieses":{"moves":[{"uci":"e2e4","best":"d2d4","evalW":36,"loss":0,"gap":0.5},{"uci":"e7e5","best":"e7e5","evalW":29,"loss":0,"gap":0.5},{"uci":"g1f3","best":"g1f3","evalW":43,"loss":0,"gap":2.8},{"uci":"b8c6","best":"b8c6","evalW":16,"loss":0,"gap":1.9},{"uci":"d2d4","best":"f1b5","evalW":19,"loss":1.84,"gap":1.7},{"uci":"e5d4","best":"e5d4","evalW":14,"loss":0,"gap":6.4},{"uci":"f3d4","best":"f3d4","evalW":12,"loss":0,"gap":0.6},{"uci":"g8f6","best":"g8f6","evalW":17,"loss":0,"gap":1.6},{"uci":"d4c6","best":"d4c6","evalW":16,"loss":0,"gap":0.8},{"uci":"b7c6","best":"b7c6","evalW":10,"loss":0,"gap":3.6},{"uci":"e4e5","best":"f1d3","evalW":13,"loss":0,"gap":0.0},{"uci":"d8e7","best":"d8e7","evalW":4,"loss":0,"gap":3.2},{"uci":"d1e2","best":"d1e2","evalW":14,"loss":0,"gap":5.5},{"uci":"f6d5","best":"f6d5","evalW":5,"loss":0,"gap":4.9},{"uci":"c2c4","best":"c2c4","evalW":7,"loss":0,"gap":1.2},{"uci":"c8a6","best":"d5b6","evalW":10,"loss":0.28,"gap":0.3},{"uci":"b2b3","best":"e2e4","evalW":0,"loss":1.29,"gap":0.6},{"uci":"g7g6","best":"g7g6","evalW":12,"loss":0,"gap":1.5},{"uci":"g2g3","best":"b1d2","evalW":1,"loss":0,"gap":0.0},{"uci":"f8g7","best":"f8g7","evalW":-8,"loss":0,"gap":2.2},{"uci":"c1b2","best":"c1b2","evalW":-3,"loss":0,"gap":9.5},{"uci":"e8g8","best":"e8g8","evalW":-21,"loss":0,"gap":3.6},{"uci":"f1g2","best":"f1h3","evalW":-21,"loss":2.3,"gap":1.5},{"uci":"a8e8","best":"a8e8","evalW":-15,"loss":0,"gap":1.8},{"uci":"e1g1","best":"e1g1","evalW":-14,"loss":0,"gap":5.8},{"uci":"f7f6","best":"g7e5","evalW":147,"loss":13.86,"gap":5.7},{"uci":"e2d2","best":"e2d2","evalW":146,"loss":0,"gap":8.9},{"uci":"f6e5","best":"f6e5","evalW":149,"loss":0,"gap":2.4},{"uci":"c4d5","best":"c4d5","evalW":152,"loss":0,"gap":9.0},{"uci":"a6f1","best":"a6f1","evalW":150,"loss":0,"gap":11.2},{"uci":"g2f1","best":"g2f1","evalW":155,"loss":0,"gap":22.2},{"uci":"e5e4","best":"c6d5","evalW":154,"loss":1.46,"gap":0.4},{"uci":"d5c6","best":"d5c6","evalW":169,"loss":0,"gap":1.0},{"uci":"e4e3","best":"e4e3","evalW":172,"loss":0,"gap":1.1},{"uci":"f1c4","best":"f1c4","evalW":183,"loss":0,"gap":16.2},{"uci":"g8h8","best":"g8h8","evalW":182,"loss":0,"gap":10.4},{"uci":"f2e3","best":"f2e3","evalW":188,"loss":0,"gap":46.9},{"uci":"e7e3","best":"e7e3","evalW":192,"loss":0,"gap":0.2},{"uci":"d2e3","best":"d2e3","evalW":189,"loss":0,"gap":44.2},{"uci":"e8e3","best":"e8e3","evalW":176,"loss":0,"gap":23.7},{"uci":"b2g7","best":"b2g7","evalW":176,"loss":0,"gap":19.5},{"uci":"h8g7","best":"h8g7","evalW":172,"loss":0,"gap":0},{"uci":"b1a3","best":"b1a3","evalW":191,"loss":0,"gap":7.2},{"uci":"e3e7","best":"d7c6","evalW":341,"loss":12.0,"gap":10.5},{"uci":"a3b5","best":"a3b5","evalW":325,"loss":0,"gap":10.8},{"uci":"f8f6","best":"d7c6","evalW":349,"loss":0,"gap":0.3},{"uci":"b5a7","best":"b5a7","evalW":332,"loss":0,"gap":4.0},{"uci":"d7c6","best":"d7c6","evalW":380,"loss":0,"gap":2.7},{"uci":"a1f1","best":"a2a4","evalW":350,"loss":1.04,"gap":0.5},{"uci":"e7d7","best":"c6c5","evalW":372,"loss":0.91,"gap":0.5},{"uci":"a2a4","best":"a2a4","evalW":369,"loss":0,"gap":3.0},{"uci":"f6d6","best":"f6d6","evalW":372,"loss":0,"gap":0.9},{"uci":"f1f2","best":"a4a5","evalW":296,"loss":3.99,"gap":1.6},{"uci":"g6g5","best":"h7h5","evalW":341,"loss":2.24,"gap":2.0},{"uci":"g1g2","best":"a7c8","evalW":300,"loss":2.59,"gap":0.1},{"uci":"h7h5","best":"h7h5","evalW":321,"loss":0,"gap":1.1},{"uci":"a4a5","best":"a7c8","evalW":282,"loss":1.05,"gap":1.1},{"uci":"g5g4","best":"d7d8","evalW":356,"loss":3.24,"gap":4.4},{"uci":"a7c8","best":"a7c6","evalW":360,"loss":0.3,"gap":1.0},{"uci":"d6d4","best":"d6d1","evalW":399,"loss":1.09,"gap":0.3},{"uci":"c4e6","best":"a5a6","evalW":341,"loss":3.18,"gap":3.8},{"uci":"d7d5","best":"d7d8","evalW":601,"loss":12.44,"gap":9.7},{"uci":"e6d5","best":"e6d5","evalW":610,"loss":0,"gap":1.0},{"uci":"d4d5","best":"c6d5","evalW":541,"loss":0,"gap":0.4},{"uci":"f2a2","best":"f2a2","evalW":602,"loss":0,"gap":1.1},{"uci":"d5d8","best":"d5d8","evalW":617,"loss":0,"gap":0.3},{"uci":"c8e7","best":"c8a7","evalW":619,"loss":0,"gap":0.3},{"uci":"d8d7","best":"d8a8","evalW":619,"loss":0,"gap":0.0},{"uci":"e7c6","best":"e7c6","evalW":666,"loss":0,"gap":1.6},{"uci":"d7d6","best":"d7f7","evalW":615,"loss":0,"gap":1.5},{"uci":"a2c2","best":"c6e5","evalW":583,"loss":0.96,"gap":0.2},{"uci":"g7g6","best":"d6d3","evalW":706,"loss":2.37,"gap":0.6},{"uci":"a5a6","best":"a5a6","evalW":688,"loss":0,"gap":0.8},{"uci":"d6d1","best":"d6e6","evalW":747,"loss":1.53,"gap":0.4},{"uci":"c2a2","best":"c2a2","evalW":694,"loss":0,"gap":1.5},{"uci":"d1d6","best":"d1e1","evalW":4358,"loss":3.55,"gap":1.8},{"uci":"a6a7","best":"a6a7","evalW":3419,"loss":0,"gap":7.2},{"uci":"d6d5","best":"g6f7","evalW":3463,"loss":0,"gap":0.0},{"uci":"a7a8q","best":"a7a8q","evalW":9990,"loss":0,"gap":0.0},{"uci":"g6f7","best":"h5h4","evalW":9993,"loss":0,"gap":0.0},{"uci":"c6d8","best":"a2e2","evalW":9993,"loss":0,"gap":0.0},{"uci":"d5d8","best":"d5d8","evalW":9994,"loss":0,"gap":0.0},{"uci":"a2f2","best":"a2f2","evalW":9995,"loss":0,"gap":0.0},{"uci":"f7g6","best":"f7g7","evalW":9996,"loss":0,"gap":0.0},{"uci":"a8d8","best":"a8d8","evalW":9996,"loss":0,"gap":0.0},{"uci":"h5h4","best":"h5h4","evalW":9997,"loss":0,"gap":0.0},{"uci":"d8g8","best":"d8g8","evalW":9997,"loss":0,"gap":0.0},{"uci":"g6h6","best":"g6h6","evalW":9998,"loss":0,"gap":0.0},{"uci":"f2f6","best":"f2f6","evalW":9998,"loss":0,"gap":0.0},{"uci":"h6h5","best":"h6h5","evalW":9999,"loss":0,"gap":0},{"uci":"g8d5","best":"g8d5","evalW":9999,"loss":0,"gap":0.0}]},"bc5":{"moves":[{"uci":"e2e4","best":"e2e4","evalW":40,"loss":0,"gap":0.4},{"uci":"e7e5","best":"e7e5","evalW":37,"loss":0,"gap":0.7},{"uci":"g1f3","best":"g1f3","evalW":36,"loss":0,"gap":1.6},{"uci":"b8c6","best":"b8c6","evalW":37,"loss":0,"gap":0.8},{"uci":"d2d4","best":"f1b5","evalW":17,"loss":1.56,"gap":1.1},{"uci":"e5d4","best":"e5d4","evalW":11,"loss":0,"gap":4.6},{"uci":"f3d4","best":"f3d4","evalW":19,"loss":0,"gap":0.3},{"uci":"f8c5","best":"g8f6","evalW":32,"loss":1.29,"gap":1.5},{"uci":"c1e3","best":"d4b3","evalW":30,"loss":0,"gap":1.5},{"uci":"d8f6","best":"d8f6","evalW":25,"loss":0,"gap":1.1},{"uci":"c2c3","best":"c2c3","evalW":17,"loss":0,"gap":5.9},{"uci":"g8e7","best":"f6g6","evalW":19,"loss":0,"gap":0.1},{"uci":"f1c4","best":"f1b5","evalW":27,"loss":0,"gap":0.1},{"uci":"c6e5","best":"c6e5","evalW":16,"loss":0,"gap":1.4},{"uci":"c4e2","best":"c4e2","evalW":21,"loss":0,"gap":1.3},{"uci":"f6g6","best":"f6g6","evalW":10,"loss":0,"gap":2.0},{"uci":"e1g1","best":"e1g1","evalW":31,"loss":0,"gap":4.8},{"uci":"d7d6","best":"d7d6","evalW":14,"loss":0,"gap":2.3},{"uci":"f2f3","best":"f2f3","evalW":23,"loss":0,"gap":2.1},{"uci":"e8g8","best":"e8g8","evalW":21,"loss":0,"gap":0.1},{"uci":"g1h1","best":"b1d2","evalW":19,"loss":0.83,"gap":1.3},{"uci":"f7f5","best":"f7f5","evalW":9,"loss":0,"gap":0.6},{"uci":"b1d2","best":"b2b4","evalW":20,"loss":0,"gap":0.4},{"uci":"f5f4","best":"f5e4","evalW":7,"loss":0,"gap":0.7},{"uci":"e3g1","best":"e3f2","evalW":19,"loss":0,"gap":0.6},{"uci":"a7a6","best":"a7a6","evalW":16,"loss":0,"gap":0.6},{"uci":"d2c4","best":"b2b4","evalW":17,"loss":0.09,"gap":0.1},{"uci":"g6f6","best":"g8h8","evalW":42,"loss":3.58,"gap":0.2},{"uci":"b2b4","best":"b2b4","evalW":29,"loss":0,"gap":0.2},{"uci":"c5d4","best":"c5a7","evalW":122,"loss":8.29,"gap":7.1},{"uci":"c3d4","best":"c3d4","evalW":124,"loss":0,"gap":9.1},{"uci":"e5g6","best":"e5c4","evalW":173,"loss":4.45,"gap":1.1},{"uci":"a1c1","best":"d4d5","evalW":121,"loss":4.87,"gap":4.7},{"uci":"g6h4","best":"d6d5","evalW":191,"loss":6.55,"gap":5.7},{"uci":"d4d5","best":"d4d5","evalW":189,"loss":0,"gap":5.3},{"uci":"b7b5","best":"f6g5","evalW":215,"loss":2.91,"gap":2.0},{"uci":"c4d2","best":"c4a5","evalW":194,"loss":5.34,"gap":3.7},{"uci":"a6a5","best":"f8f7","evalW":259,"loss":6.11,"gap":1.8},{"uci":"b4a5","best":"a2a4","evalW":256,"loss":0.74,"gap":0.4},{"uci":"a8a5","best":"a8a5","evalW":263,"loss":0,"gap":0.4},{"uci":"c1c2","best":"d1b3","evalW":255,"loss":1.54,"gap":3.6},{"uci":"h4g2","best":"e7g6","evalW":326,"loss":5.49,"gap":0.7},{"uci":"d2b3","best":"h1g2","evalW":344,"loss":0,"gap":0.1},{"uci":"c8f5","best":"a5a4","evalW":540,"loss":9.94,"gap":1.3},{"uci":"h1g2","best":"e4f5","evalW":477,"loss":3.07,"gap":1.3},{"uci":"a5a8","best":"f6g6","evalW":582,"loss":3.95,"gap":0.3},{"uci":"e4f5","best":"e4f5","evalW":598,"loss":0,"gap":4.0},{"uci":"f6h4","best":"e7f5","evalW":605,"loss":0.03,"gap":0.2},{"uci":"e2b5","best":"e2d3","evalW":595,"loss":0.96,"gap":0.1},{"uci":"h4h5","best":"e7f5","evalW":624,"loss":0,"gap":0.0},{"uci":"b3d4","best":"b3d4","evalW":622,"loss":0,"gap":0.7},{"uci":"g8h8","best":"f8f5","evalW":628,"loss":0.03,"gap":0.3},{"uci":"g2h1","best":"c2c7","evalW":632,"loss":0.26,"gap":0.1},{"uci":"f8f5","best":"e7f5","evalW":648,"loss":0.03,"gap":0.1},{"uci":"c2c7","best":"c2c7","evalW":666,"loss":0,"gap":0.7},{"uci":"e7d5","best":"f5e5","evalW":663,"loss":0.28,"gap":0.3},{"uci":"d4f5","best":"d4f5","evalW":675,"loss":0,"gap":0.9},{"uci":"d5c7","best":"d5c7","evalW":678,"loss":0,"gap":1.2},{"uci":"b5c6","best":"b5c6","evalW":688,"loss":0,"gap":0.7},{"uci":"a8d8","best":"a8f8","evalW":674,"loss":0,"gap":0.0},{"uci":"c6e4","best":"f5d4","evalW":658,"loss":0,"gap":0.0},{"uci":"d6d5","best":"d6d5","evalW":651,"loss":0,"gap":0.5},{"uci":"e4d3","best":"e4b1","evalW":676,"loss":0,"gap":0.1},{"uci":"d8e8","best":"c7e6","evalW":701,"loss":0.92,"gap":0.3},{"uci":"d1c2","best":"d1c2","evalW":870,"loss":0,"gap":0.3},{"uci":"c7e6","best":"c7e6","evalW":754,"loss":0,"gap":2.3},{"uci":"c2c6","best":"c2c6","evalW":761,"loss":0,"gap":1.1},{"uci":"e6d8","best":"e6d8","evalW":793,"loss":0,"gap":1.2},{"uci":"c6d5","best":"c6d5","evalW":802,"loss":0,"gap":1.3},{"uci":"h5f7","best":"h5f7","evalW":812,"loss":0,"gap":2.2},{"uci":"d5f7","best":"d5f7","evalW":847,"loss":0,"gap":1.2},{"uci":"d8f7","best":"d8f7","evalW":839,"loss":0,"gap":4.4},{"uci":"g1d4","best":"g1d4","evalW":816,"loss":0,"gap":3.0},{"uci":"h7h6","best":"h8g8","evalW":3494,"loss":3.37,"gap":0.5},{"uci":"d4g7","best":"d4g7","evalW":3510,"loss":0,"gap":2.0},{"uci":"h8g8","best":"h8g8","evalW":1271,"loss":0,"gap":0.9},{"uci":"f1g1","best":"f1g1","evalW":3471,"loss":0,"gap":4.2},{"uci":"f7g5","best":"f7g5","evalW":3493,"loss":0,"gap":0.0},{"uci":"g7h6","best":"g7h6","evalW":3717,"loss":0,"gap":0.0},{"uci":"g8f7","best":"g8f7","evalW":3579,"loss":0,"gap":0.0},{"uci":"h6g5","best":"h6g5","evalW":3741,"loss":0,"gap":0.0},{"uci":"f7e6","best":"e8a8","evalW":4643,"loss":0.0,"gap":0.0},{"uci":"g1e1","best":"g1e1","evalW":9984,"loss":0,"gap":0.0},{"uci":"e6d7","best":"e6d5","evalW":9987,"loss":0.0,"gap":0.0},{"uci":"d3b5","best":"d3b5","evalW":9990,"loss":0,"gap":0.0},{"uci":"d7c7","best":"d7c7","evalW":9988,"loss":0,"gap":0.0},{"uci":"b5e8","best":"b5e8","evalW":9989,"loss":0,"gap":0.0},{"uci":"c7b6","best":"c7b6","evalW":9991,"loss":0,"gap":0.0},{"uci":"g5d8","best":"g5f4","evalW":9990,"loss":0,"gap":0.0},{"uci":"b6b7","best":"b6b7","evalW":9992,"loss":0,"gap":0.0},{"uci":"f5d6","best":"e1b1","evalW":9995,"loss":0,"gap":0.0},{"uci":"b7a6","best":"b7a6","evalW":9996,"loss":0,"gap":0.0},{"uci":"d8c7","best":"e8b5","evalW":9997,"loss":0,"gap":0.0},{"uci":"a6a7","best":"a6a7","evalW":9998,"loss":0,"gap":0},{"uci":"e1e4","best":"e1e4","evalW":9998,"loss":0,"gap":0.0},{"uci":"a7a6","best":"a7a6","evalW":9999,"loss":0,"gap":0.0},{"uci":"e4a4","best":"e4a4","evalW":9999,"loss":0,"gap":0.0}]}};
+EVALS.goring = {"moves":[{"uci":"e2e4","best":"e2e4","evalW":32,"loss":0,"gap":0.1},{"uci":"e7e5","best":"e7e5","evalW":28,"loss":0,"gap":1.2},{"uci":"g1f3","best":"g1f3","evalW":38,"loss":0,"gap":2.2},{"uci":"b8c6","best":"b8c6","evalW":30,"loss":0,"gap":1.4},{"uci":"d2d4","best":"f1b5","evalW":31,"loss":1.1,"gap":1.4},{"uci":"e5d4","best":"e5d4","evalW":21,"loss":0,"gap":5.6},{"uci":"c2c3","best":"f3d4","evalW":-27,"loss":4.32,"gap":0.6},{"uci":"d4c3","best":"d4c3","evalW":-18,"loss":0,"gap":1.3},{"uci":"b1c3","best":"b1c3","evalW":-23,"loss":0,"gap":2.7},{"uci":"d7d6","best":"f8c5","evalW":-11,"loss":0.64,"gap":0.2},{"uci":"f1c4","best":"c1e3","evalW":-17,"loss":1.56,"gap":0.3},{"uci":"c8g4","best":"g8f6","evalW":75,"loss":8.7,"gap":3.3},{"uci":"e1g1","best":"d1b3","evalW":32,"loss":4.37,"gap":0.7},{"uci":"c6e5","best":"g8f6","evalW":562,"loss":35.85,"gap":1.2},{"uci":"f3e5","best":"f3e5","evalW":556,"loss":0,"gap":29.0},{"uci":"g4d1","best":"d6e5","evalW":9998,"loss":11.21,"gap":2.1},{"uci":"c4f7","best":"c4f7","evalW":9998,"loss":0,"gap":39.0},{"uci":"e8e7","best":"e8e7","evalW":9999,"loss":0,"gap":0},{"uci":"c3d5","best":"c3d5","evalW":9999,"loss":0,"gap":0.0}]};
+
+const files = "abcdefgh";
+const sqIdx = s => ({ f: files.indexOf(s[0]), r: 8 - Number(s[1]) });
+const $ = id => document.getElementById(id);
+const winW = cp => 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
+const fmtCp = cp => Math.abs(cp) >= 9000 ? (cp > 0 ? "+" : "−") + "M" + (10000 - Math.abs(cp))
+                                         : (cp >= 0 ? "+" : "−") + (Math.abs(cp) / 100).toFixed(1);
+
+function classify(v, i) {
+  const e = EVALS[v].moves[i];
+  if (i < VARIANTS[v].book) return "book";
+  if ((VARIANTS[v].brilliant || []).includes(i)) return "brilliant";
+  const isCapture = VARIANTS[v].moves[i][0].includes("x");
+  const forced = i > 0 && VARIANTS[v].moves[i - 1][0].includes("+");  // ответ на шах — не «отличный»
+  if (e.loss <= 0.5 && e.gap >= 8 && !isCapture && !forced) return "great";
+  if (e.loss <= 0.2 || e.uci === e.best) return "best";
+  if (e.loss <= 2) return "excellent";
+  if (e.loss <= 5) return "good";
+  if (e.loss <= 10) return "inaccuracy";
+  if (e.loss <= 20) return "mistake";
+  return "blunder";
+}
+const badge = c => `<span class="badge" style="background:${CLS[c].color}">${CLS[c].sym}</span>`;
+
+// клетки
+for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) {
+  const d = document.createElement("div");
+  d.className = "sq " + ((r + f) % 2 ? "d" : "l");
+  d.id = "sq-" + files[f] + (8 - r);
+  if (r === 7) d.innerHTML += `<span class="coord f">${files[f]}</span>`;
+  if (f === 0) d.innerHTML += `<span class="coord r">${8 - r}</span>`;
+  $("squares").appendChild(d);
+}
+$("legend").innerHTML = ["brilliant","great","best","excellent","good","book","inaccuracy","mistake","blunder"]
+  .map(c => `<span>${badge(c)} ${CLS[c].name}</span>`).join("");
+
+let V = "mieses", line, pieces = [], ply = 0, timer = null;
+
+function buildMoves() {
+  line = VARIANTS[V].moves;
+  $("sub").textContent = VARIANTS[V].sub;
+  $("tabs").innerHTML = Object.entries(VARIANTS).map(([k, v]) =>
+    `<button class="tab ${k === V ? "on" : ""}" data-v="${k}">${v.tab}</button>`).join("");
+  let h = "";
+  for (let i = 0; i < line.length; i += 2) {
+    h += `<span class="n">${i / 2 + 1}.</span>`;
+    for (const j of [i, i + 1]) h += line[j]
+      ? `<span class="mv" data-i="${j + 1}">${badge(classify(V, j))}${line[j][0]}</span>` : "<span></span>";
+  }
+  $("moves").innerHTML = h;
+}
+
+function place(p) { p.el.style.transform = `translate(${p.f * 100}%, ${p.r * 100}%)`; }
+
+function setup() {
+  $("pieces").innerHTML = ""; pieces = [];
+  START.forEach((row, r) => [...row].forEach((ch, f) => {
+    if (ch === ".") return;
+    const el = document.createElement("div");
+    el.className = "pc " + (ch === ch.toUpperCase() ? "w" : "b");
+    el.textContent = GLYPH[ch.toLowerCase()] + "︎";
+    const p = { el, f, r, alive: true, king: ch.toLowerCase() === "k", pawn: ch.toLowerCase() === "p" };
+    place(p); $("pieces").appendChild(el); pieces.push(p);
+  }));
+}
+const at = (f, r) => pieces.find(p => p.alive && p.f === f && p.r === r);
+
+function apply(i) {
+  const u = EVALS[V].moves[i].uci;
+  const a = sqIdx(u.slice(0, 2)), b = sqIdx(u.slice(2, 4));
+  const p = at(a.f, a.r);
+  let victim = at(b.f, b.r);
+  if (!victim && p.pawn && a.f !== b.f) victim = at(b.f, a.r);   // взятие на проходе
+  if (victim) { victim.alive = false; setTimeout(() => victim.el.classList.add("gone"), 250); }
+  pieces.forEach(x => x.el.classList.remove("moving"));
+  if (p.king && Math.abs(b.f - a.f) === 2) {          // рокировка: двигаем и ладью
+    const rook = at(b.f > a.f ? 7 : 0, a.r);
+    rook.f = b.f > a.f ? 5 : 3; place(rook);
+  }
+  p.f = b.f; p.r = b.r; p.el.classList.add("moving"); place(p);
+  if (u[4]) {                                           // превращение пешки
+    p.pawn = false;
+    setTimeout(() => { p.el.textContent = GLYPH[u[4]] + "\uFE0E"; }, 350);
+  }
+}
+
+function setEval(cp, over) {
+  const w = over ? 100 : winW(cp);
+  $("barW").style.height = Math.max(3, Math.min(97, w)) + "%";
+  const n = $("barNum");
+  n.textContent = over ? "1-0" : fmtCp(cp).replace("+", "");
+  n.className = "num " + (cp >= 0 ? "bottom" : "top");
+  const wr = Math.round(w);
+  $("cw").style.flexBasis = wr + "%"; $("cb").style.flexBasis = (100 - wr) + "%";
+  const lbl = (name, v) => v >= 25 ? `${name} ${v}%` : v >= 8 ? `${v}%` : "";   // узкий кусок — короткая подпись
+  $("cw").textContent = lbl("Белые", wr); $("cb").textContent = lbl("Чёрные", 100 - wr);
+  $("cw").style.padding = wr < 8 ? "0" : ""; $("cb").style.padding = wr > 92 ? "0" : "";
+}
+
+function ui() {
+  document.querySelectorAll(".sq.hl").forEach(s => { s.classList.remove("hl"); s.style.removeProperty("--hlc"); });
+  document.querySelectorAll(".mv").forEach(m => m.classList.toggle("cur", +m.dataset.i === ply));
+  const cur = document.querySelector(".mv.cur"), box = $("moves");
+  if (cur) {   // scrollIntoView двигал всю страницу, поэтому прокручиваем только сам список
+    const top = cur.offsetTop, bottom = top + cur.offsetHeight;
+    if (top < box.scrollTop) box.scrollTop = top - 4;
+    else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight + 4;
+  }
+  $("arrows").querySelectorAll("line").forEach(l => l.remove());
+  $("sqbadge").innerHTML = "";
+  if (ply === 0) {
+    setEval(START_CP);
+    $("comment").innerHTML = `<div class="head"><span class="san">Начальная позиция</span></div>
+      Жми «Играть» и смотри, как белые разыгрывают шотландскую партию. Слева от доски шкала оценки, сверху справа шансы на победу.`;
+    return;
+  }
+  const i = ply - 1, e = EVALS[V].moves[i], c = classify(V, i);
+  const from = e.uci.slice(0, 2), to = e.uci.slice(2, 4);
+  for (const s of [from, to]) { const el = $("sq-" + s); el.classList.add("hl"); el.style.setProperty("--hlc", CLS[c].color + "88"); }
+  // значок на клетке, куда пришла фигура
+  const b = sqIdx(to);
+  $("sqbadge").style.transform = `translate(${b.f * 100}%, ${b.r * 100}%)`;
+  $("sqbadge").innerHTML = badge(c);
+  const over = VARIANTS[V].mate && ply === line.length;
+  setEval(e.evalW, over);
+
+  const n = Math.ceil(ply / 2), w = ply % 2 === 1;
+  let extra = "";
+  if (c !== "book" && e.uci !== e.best && e.loss > 0.2) {
+    const bf = e.best.slice(0, 2), bt = e.best.slice(2, 4);
+    extra = `<div class="bestline">Лучший ход по движку: ${bf}–${bt}</div>`;
+  }
+  $("comment").innerHTML = `<div class="head">${badge(c)}<span class="san">${n}.${w ? "" : ".."} ${line[i][0]}</span>
+      <span class="cls" style="color:${CLS[c].color}">${CLS[c].name}</span><span class="ev">${over ? "1-0" : fmtCp(e.evalW)}</span></div>
+      ${line[i][1]}${extra}`;
+
+  if (w) {   // стрелка для ходов белых, ведь мы играем за них
+    const a = sqIdx(from);
+    const x1 = a.f + .5, y1 = a.r + .5, x2 = b.f + .5, y2 = b.r + .5;
+    const len = Math.hypot(x2 - x1, y2 - y1), k = (len - .35) / len;
+    const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    Object.entries({ x1, y1, x2: x1 + (x2 - x1) * k, y2: y1 + (y2 - y1) * k,
+      stroke: "rgba(20,120,60,.7)", "stroke-width": .16, "stroke-linecap": "round",
+      "marker-end": "url(#ah)" }).forEach(([k2, v]) => l.setAttribute(k2, v));
+    $("arrows").appendChild(l);
+  }
+}
+
+function goto(target) {
+  document.documentElement.style.setProperty("--dur", "0ms");
+  setup();
+  for (let i = 0; i < target; i++) apply(i);
+  pieces.forEach(p => { if (!p.alive) p.el.classList.add("gone"); });
+  ply = target; ui();
+  requestAnimationFrame(() => requestAnimationFrame(() =>
+    document.documentElement.style.setProperty("--dur", "600ms")));
+}
+function next() {
+  if (ply >= line.length) { stop(); return false; }
+  apply(ply); ply++; ui(); return true;
+}
+function stop() { clearInterval(timer); timer = null; $("play").textContent = "▶ Играть"; }
+function play() {
+  if (ply >= line.length) goto(0);
+  $("play").textContent = "⏸ Пауза";
+  next();
+  timer = setInterval(() => { if (!next()) stop(); }, +$("speed").value);
+}
+function switchTo(v) { stop(); V = v; buildMoves(); goto(0); }
+
+$("play").onclick = () => timer ? stop() : play();
+$("next").onclick = () => { stop(); next(); };
+$("prev").onclick = () => { stop(); if (ply > 0) goto(ply - 1); };
+$("reset").onclick = () => { stop(); goto(0); };
+$("speed").onchange = () => { if (timer) { stop(); play(); } };
+$("moves").onclick = e => { const m = e.target.closest(".mv"); if (m) { stop(); goto(+m.dataset.i); } };
+$("tabs").onclick = e => { const t = e.target.closest(".tab"); if (t && t.dataset.v !== V) switchTo(t.dataset.v); };
+document.addEventListener("keydown", e => {
+  if (e.key === "ArrowRight") $("next").click();
+  if (e.key === "ArrowLeft") $("prev").click();
+  if (e.key === " ") { e.preventDefault(); $("play").click(); }
+});
+
+switchTo("mieses");
+</script>
+</body>
+</html>
