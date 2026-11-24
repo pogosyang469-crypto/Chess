@@ -12,7 +12,7 @@ for o in ["Threads value 4","Hash value 256","MultiPV value 2"]: send("setoption
 send("isready"); read_until("readyok")
 D=20
 def sc_of(t):
-    i=t.index("score"); return int(t[i+2]) if t[i+1]=="cp" else (10000 if int(t[i+2])>0 else -10000)
+    i=t.index("score"); n=int(t[i+2]); return n if t[i+1]=="cp" else ((10000-abs(n)) if n>0 else -(10000-abs(n)))
 def search(moves, restrict=None):
     send("ucinewgame"); send("position startpos moves "+" ".join(moves))
     send(f"go depth {D}"+(f" searchmoves {restrict}" if restrict else ""))
@@ -34,6 +34,7 @@ for name,moves in lines.items():
         gap=wp(best[0])-wp(second[0]) if second[0] is not None else 0
         res.append(dict(uci=m,best=best[1],evalW=played*stm,loss=round(loss,2),gap=round(gap,1)))
         print(name,i,m,res[-1],flush=True)
-    fin=search(moves)[1][0]*(1 if len(moves)%2==0 else -1)
+    pv=search(moves)
+    fin=pv[1][0]*(1 if len(moves)%2==0 else -1) if 1 in pv else None  # None — мат/пат на доске
     outall[name]=dict(moves=res,final=fin)
 json.dump(outall,open("evals.json","w"),indent=1)

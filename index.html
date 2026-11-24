@@ -102,7 +102,8 @@
   .head .cls { font-weight: 700; font-size: 14px; }
   .head .ev { margin-left: auto; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .bestline { color: var(--muted); font-size: 13px; margin-top: 6px; }
-  .moves { margin-top: 14px; display: grid; grid-template-columns: 30px 1fr 1fr; gap: 2px 6px; font-size: 15px; }
+  .moves { margin-top: 14px; max-height: 300px; overflow-y: auto; position: relative; align-content: start;
+           overscroll-behavior: contain; display: grid; grid-template-columns: 30px 1fr 1fr; gap: 2px 6px; font-size: 15px; }
   .moves .n { color: var(--muted); padding-top: 3px; }
   .mv { padding: 3px 6px; border-radius: 5px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
   .mv .badge { width: 16px; height: 16px; font-size: 9px; }
@@ -255,20 +256,45 @@ const VARIANTS = {
       ["a6",   "Чёрные заранее освобождают слону поле a7."],
       ["Nc4",  "Белые предлагают размен коня e5. Позиция примерно равная, у обеих сторон есть игра."]
     ]
+  },
+  goring: {
+    tab: "4.c3 — гамбит Гёринга",
+    sub: "1.e4 e5 2.Nf3 Nc6 3.d4 exd4 4.c3 — жертва пешки и мат Легаля",
+    book: 9,
+    brilliant: [14],
+    mate: true,
+    moves: [...COMMON.slice(0, 6),
+      ["c3",   "Гамбит Гёринга! Вместо взятия на d4 белые жертвуют пешку ради быстрого развития и атаки."],
+      ["dxc3", "Чёрные принимают жертву."],
+      ["Nxc3", "Конь забирает пешку и выходит в игру. Белые отдали пешку, зато у них уже две развитые фигуры и открытые линии."],
+      ["d6",   "Солидно, но пассивно. Движок предпочитает активное 5...Bc5."],
+      ["Bc4",  "Слон нацеливается на самую слабую точку чёрных, пешку f7."],
+      ["Bg4",  "Неточность. Слон связывает коня f3 с ферзём, и чёрным кажется, что конь теперь не может сдвинуться. Это ловушка."],
+      ["O-O",  "Белые спокойно рокируют. Движок предлагал Qb3 с ударом по f7 и b7, но рокировка тоже держит инициативу."],
+      ["Ne5",  "Зевок! Чёрные атакуют слона c4 и верят, что конь f3 связан. Надо было 7...Nf6."],
+      ["Nxe5", "Блестящий ход! Белые жертвуют ферзя: «связанный» конь всё равно прыгает. Это знаменитый мат Легаля."],
+      ["Bxd1", "Чёрные жадно берут ферзя, и это уже мат в 2 хода. После 8...dxe5 9.Qxg4 они остались бы без фигуры, но мата бы не было."],
+      ["Bxf7+","Шах! Слон врывается на f7, и королю приходится отступать."],
+      ["Ke7",  "Единственный ход."],
+      ["Nd5#", "МАТ! Конь d5 даёт шах, а все поля вокруг короля закрыты: d7 держит конь e5, e8 и e6 держит слон f7, f6 держит конь d5. Взять слона f7 нельзя, его защищает конь e5. Белые выиграли без ферзя!"]
+    ]
   }
 };
 
 const EVALS = {"mieses":{"moves":[{"uci":"e2e4","best":"e2e4","evalW":32,"loss":0,"gap":0.6},{"uci":"e7e5","best":"e7e5","evalW":23,"loss":0,"gap":1.5},{"uci":"g1f3","best":"g1f3","evalW":20,"loss":0,"gap":0.8},{"uci":"b8c6","best":"b8c6","evalW":27,"loss":0,"gap":1.3},{"uci":"d2d4","best":"f1b5","evalW":25,"loss":0,"gap":0.7},{"uci":"e5d4","best":"e5d4","evalW":15,"loss":0,"gap":4.1},{"uci":"f3d4","best":"f3d4","evalW":12,"loss":0,"gap":1.2},{"uci":"g8f6","best":"g8f6","evalW":19,"loss":0,"gap":1.6},{"uci":"d4c6","best":"d4c6","evalW":17,"loss":0,"gap":0.9},{"uci":"b7c6","best":"b7c6","evalW":16,"loss":0,"gap":3.4},{"uci":"e4e5","best":"b1c3","evalW":25,"loss":0,"gap":0.1},{"uci":"d8e7","best":"d8e7","evalW":9,"loss":0,"gap":3.7},{"uci":"d1e2","best":"d1e2","evalW":4,"loss":0,"gap":4.6},{"uci":"f6d5","best":"f6d5","evalW":9,"loss":0,"gap":4.5},{"uci":"c2c4","best":"c2c4","evalW":12,"loss":0,"gap":1.5},{"uci":"c8a6","best":"d5b6","evalW":20,"loss":1.47,"gap":0.0},{"uci":"b2b3","best":"b2b3","evalW":0,"loss":0,"gap":0.0},{"uci":"g7g6","best":"g7g6","evalW":6,"loss":0,"gap":2.6},{"uci":"g2g3","best":"b1d2","evalW":-9,"loss":0.83,"gap":0.0},{"uci":"f8g7","best":"f8g7","evalW":-21,"loss":0,"gap":1.8},{"uci":"c1b2","best":"c1b2","evalW":0,"loss":0,"gap":8.0},{"uci":"e8g8","best":"e8g8","evalW":-9,"loss":0,"gap":2.2},{"uci":"f1g2","best":"f1g2","evalW":-12,"loss":0,"gap":0.6},{"uci":"a8e8","best":"a8e8","evalW":-14,"loss":0,"gap":1.9},{"uci":"e1g1","best":"e1g1","evalW":-11,"loss":0,"gap":6.4},{"uci":"f7f6","best":"g7e5","evalW":150,"loss":14.85,"gap":7.8},{"uci":"e2d2","best":"e2d2","evalW":157,"loss":0,"gap":9.0},{"uci":"f6e5","best":"f6e5","evalW":156,"loss":0,"gap":3.4},{"uci":"c4d5","best":"c4d5","evalW":146,"loss":0,"gap":10.3},{"uci":"a6f1","best":"a6f1","evalW":150,"loss":0,"gap":11.9},{"uci":"g2f1","best":"g2f1","evalW":157,"loss":0,"gap":21.0},{"uci":"e5e4","best":"c6d5","evalW":192,"loss":4.19,"gap":0.3},{"uci":"d5c6","best":"d5c6","evalW":179,"loss":0,"gap":1.9},{"uci":"e4e3","best":"e4e3","evalW":181,"loss":0,"gap":1.6},{"uci":"f1c4","best":"f1c4","evalW":193,"loss":0,"gap":17.1},{"uci":"g8h8","best":"g8h8","evalW":183,"loss":0,"gap":12.4},{"uci":"f2e3","best":"f2e3","evalW":180,"loss":0,"gap":49.6}]},"bc5":{"moves":[{"uci":"e2e4","best":"d2d4","evalW":35,"loss":0,"gap":0.3},{"uci":"e7e5","best":"e7e5","evalW":28,"loss":0,"gap":0.7},{"uci":"g1f3","best":"g1f3","evalW":26,"loss":0,"gap":0.7},{"uci":"b8c6","best":"b8c6","evalW":22,"loss":0,"gap":2.2},{"uci":"d2d4","best":"f1b5","evalW":24,"loss":0,"gap":0.0},{"uci":"e5d4","best":"e5d4","evalW":21,"loss":0,"gap":3.9},{"uci":"f3d4","best":"f3d4","evalW":14,"loss":0,"gap":1.3},{"uci":"f8c5","best":"g8f6","evalW":35,"loss":2.3,"gap":2.0},{"uci":"c1e3","best":"d4b3","evalW":27,"loss":0.83,"gap":1.7},{"uci":"d8f6","best":"d8f6","evalW":26,"loss":0,"gap":2.5},{"uci":"c2c3","best":"c2c3","evalW":29,"loss":0,"gap":9.2},{"uci":"g8e7","best":"g8e7","evalW":17,"loss":0,"gap":0.2},{"uci":"f1c4","best":"f1c4","evalW":25,"loss":0,"gap":0.4},{"uci":"c6e5","best":"c6e5","evalW":22,"loss":0,"gap":0.6},{"uci":"c4e2","best":"c4e2","evalW":16,"loss":0,"gap":1.1},{"uci":"f6g6","best":"f6g6","evalW":21,"loss":0,"gap":2.2},{"uci":"e1g1","best":"e1g1","evalW":22,"loss":0,"gap":3.9},{"uci":"d7d6","best":"d7d6","evalW":26,"loss":0,"gap":1.2},{"uci":"f2f3","best":"f2f3","evalW":24,"loss":0,"gap":2.2},{"uci":"e8g8","best":"d6d5","evalW":24,"loss":0,"gap":0.0},{"uci":"g1h1","best":"b1d2","evalW":10,"loss":1.1,"gap":0.5},{"uci":"f7f5","best":"f7f5","evalW":13,"loss":0,"gap":0.6},{"uci":"b1d2","best":"b2b4","evalW":18,"loss":0.28,"gap":0.3},{"uci":"f5f4","best":"f5e4","evalW":12,"loss":0.18,"gap":0.1},{"uci":"e3g1","best":"e3f2","evalW":14,"loss":0,"gap":0.6},{"uci":"a7a6","best":"a7a6","evalW":6,"loss":0,"gap":2.4},{"uci":"d2c4","best":"b2b4","evalW":2,"loss":0.09,"gap":0.3}]}};
+EVALS.goring = {"moves":[{"uci":"e2e4","best":"e2e4","evalW":32,"loss":0,"gap":0.1},{"uci":"e7e5","best":"e7e5","evalW":28,"loss":0,"gap":1.2},{"uci":"g1f3","best":"g1f3","evalW":38,"loss":0,"gap":2.2},{"uci":"b8c6","best":"b8c6","evalW":30,"loss":0,"gap":1.4},{"uci":"d2d4","best":"f1b5","evalW":31,"loss":1.1,"gap":1.4},{"uci":"e5d4","best":"e5d4","evalW":21,"loss":0,"gap":5.6},{"uci":"c2c3","best":"f3d4","evalW":-27,"loss":4.32,"gap":0.6},{"uci":"d4c3","best":"d4c3","evalW":-18,"loss":0,"gap":1.3},{"uci":"b1c3","best":"b1c3","evalW":-23,"loss":0,"gap":2.7},{"uci":"d7d6","best":"f8c5","evalW":-11,"loss":0.64,"gap":0.2},{"uci":"f1c4","best":"c1e3","evalW":-17,"loss":1.56,"gap":0.3},{"uci":"c8g4","best":"g8f6","evalW":75,"loss":8.7,"gap":3.3},{"uci":"e1g1","best":"d1b3","evalW":32,"loss":4.37,"gap":0.7},{"uci":"c6e5","best":"g8f6","evalW":562,"loss":35.85,"gap":1.2},{"uci":"f3e5","best":"f3e5","evalW":556,"loss":0,"gap":29.0},{"uci":"g4d1","best":"d6e5","evalW":9998,"loss":11.21,"gap":2.1},{"uci":"c4f7","best":"c4f7","evalW":9998,"loss":0,"gap":39.0},{"uci":"e8e7","best":"e8e7","evalW":9999,"loss":0,"gap":0},{"uci":"c3d5","best":"c3d5","evalW":9999,"loss":0,"gap":0.0}]};
 
 const files = "abcdefgh";
 const sqIdx = s => ({ f: files.indexOf(s[0]), r: 8 - Number(s[1]) });
 const $ = id => document.getElementById(id);
 const winW = cp => 50 + 50 * (2 / (1 + Math.exp(-0.00368208 * cp)) - 1);
-const fmtCp = cp => Math.abs(cp) >= 9000 ? "M" : (cp >= 0 ? "+" : "−") + (Math.abs(cp) / 100).toFixed(1);
+const fmtCp = cp => Math.abs(cp) >= 9000 ? (cp > 0 ? "+" : "−") + "M" + (10000 - Math.abs(cp))
+                                         : (cp >= 0 ? "+" : "−") + (Math.abs(cp) / 100).toFixed(1);
 
 function classify(v, i) {
   const e = EVALS[v].moves[i];
   if (i < VARIANTS[v].book) return "book";
+  if ((VARIANTS[v].brilliant || []).includes(i)) return "brilliant";
   const isCapture = VARIANTS[v].moves[i][0].includes("x");
   const forced = i > 0 && VARIANTS[v].moves[i - 1][0].includes("+");  // ответ на шах — не «отличный»
   if (e.loss <= 0.5 && e.gap >= 8 && !isCapture && !forced) return "great";
@@ -290,7 +316,7 @@ for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) {
   if (f === 0) d.innerHTML += `<span class="coord r">${8 - r}</span>`;
   $("squares").appendChild(d);
 }
-$("legend").innerHTML = ["great","best","excellent","good","book","inaccuracy","mistake","blunder"]
+$("legend").innerHTML = ["brilliant","great","best","excellent","good","book","inaccuracy","mistake","blunder"]
   .map(c => `<span>${badge(c)} ${CLS[c].name}</span>`).join("");
 
 let V = "mieses", line, pieces = [], ply = 0, timer = null;
@@ -338,21 +364,28 @@ function apply(i) {
   p.f = b.f; p.r = b.r; p.el.classList.add("moving"); place(p);
 }
 
-function setEval(cp) {
-  const w = winW(cp);
+function setEval(cp, over) {
+  const w = over ? 100 : winW(cp);
   $("barW").style.height = Math.max(3, Math.min(97, w)) + "%";
   const n = $("barNum");
-  n.textContent = fmtCp(cp).replace("+", "");
+  n.textContent = over ? "1-0" : fmtCp(cp).replace("+", "");
   n.className = "num " + (cp >= 0 ? "bottom" : "top");
   const wr = Math.round(w);
   $("cw").style.flexBasis = wr + "%"; $("cb").style.flexBasis = (100 - wr) + "%";
-  $("cw").textContent = `Белые ${wr}%`; $("cb").textContent = `Чёрные ${100 - wr}%`;
+  const lbl = (name, v) => v >= 25 ? `${name} ${v}%` : v >= 8 ? `${v}%` : "";   // узкий кусок — короткая подпись
+  $("cw").textContent = lbl("Белые", wr); $("cb").textContent = lbl("Чёрные", 100 - wr);
+  $("cw").style.padding = wr < 8 ? "0" : ""; $("cb").style.padding = wr > 92 ? "0" : "";
 }
 
 function ui() {
   document.querySelectorAll(".sq.hl").forEach(s => { s.classList.remove("hl"); s.style.removeProperty("--hlc"); });
   document.querySelectorAll(".mv").forEach(m => m.classList.toggle("cur", +m.dataset.i === ply));
-  const cur = document.querySelector(".mv.cur"); if (cur) cur.scrollIntoView({ block: "nearest" });
+  const cur = document.querySelector(".mv.cur"), box = $("moves");
+  if (cur) {   // scrollIntoView двигал всю страницу, поэтому прокручиваем только сам список
+    const top = cur.offsetTop, bottom = top + cur.offsetHeight;
+    if (top < box.scrollTop) box.scrollTop = top - 4;
+    else if (bottom > box.scrollTop + box.clientHeight) box.scrollTop = bottom - box.clientHeight + 4;
+  }
   $("arrows").querySelectorAll("line").forEach(l => l.remove());
   $("sqbadge").innerHTML = "";
   if (ply === 0) {
@@ -368,7 +401,8 @@ function ui() {
   const b = sqIdx(to);
   $("sqbadge").style.transform = `translate(${b.f * 100}%, ${b.r * 100}%)`;
   $("sqbadge").innerHTML = badge(c);
-  setEval(e.evalW);
+  const over = VARIANTS[V].mate && ply === line.length;
+  setEval(e.evalW, over);
 
   const n = Math.ceil(ply / 2), w = ply % 2 === 1;
   let extra = "";
@@ -377,7 +411,7 @@ function ui() {
     extra = `<div class="bestline">Лучший ход по движку: ${bf}–${bt}</div>`;
   }
   $("comment").innerHTML = `<div class="head">${badge(c)}<span class="san">${n}.${w ? "" : ".."} ${line[i][0]}</span>
-      <span class="cls" style="color:${CLS[c].color}">${CLS[c].name}</span><span class="ev">${fmtCp(e.evalW)}</span></div>
+      <span class="cls" style="color:${CLS[c].color}">${CLS[c].name}</span><span class="ev">${over ? "1-0" : fmtCp(e.evalW)}</span></div>
       ${line[i][1]}${extra}`;
 
   if (w) {   // стрелка для ходов белых, ведь мы играем за них
