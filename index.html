@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Шотландская партия</title>
+<style>
+  :root {
+    --bg: #f4efe6; --fg: #2b2620; --muted: #7a6f60; --card: #fffaf2;
+    --light: #f0d9b5; --dark: #b58863; --hl: rgba(255, 214, 64, .55);
+    --accent: #8a4b1f; --border: #d8cbb6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1b1916; --fg: #ece5d8; --muted: #a59a88; --card: #25221e;
+      --border: #3b352e; --accent: #e0a56f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1b1916; --fg: #ece5d8; --muted: #a59a88; --card: #25221e;
+    --border: #3b352e; --accent: #e0a56f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; justify-content: center; padding: 24px 16px;
+  }
+  .wrap { width: 100%; max-width: 980px; display: grid; gap: 24px;
+          grid-template-columns: minmax(0, 560px) minmax(0, 1fr); align-items: start; }
+  @media (max-width: 820px) { .wrap { grid-template-columns: 1fr; } }
+  h1 { margin: 0 0 4px; font-size: 26px; }
+  .sub { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
+
+  .board-box { position: relative; width: 100%; aspect-ratio: 1; border-radius: 6px;
+               overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
+  .squares { position: absolute; inset: 0; display: grid;
+             grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); }
+  .sq { position: relative; }
+  .sq.l { background: var(--light); } .sq.d { background: var(--dark); }
+  .sq.hl::after { content: ""; position: absolute; inset: 0; background: var(--hl); }
+  .coord { position: absolute; font-size: clamp(8px, 1.8vw, 12px); font-weight: 600; z-index: 1; }
+  .sq.l .coord { color: var(--dark); } .sq.d .coord { color: var(--light); }
+  .coord.f { right: 3px; bottom: 1px; } .coord.r { left: 3px; top: 1px; }
+
+  .pieces { position: absolute; inset: 0; pointer-events: none; }
+  .pc { position: absolute; width: 12.5%; height: 12.5%; display: flex;
+        align-items: center; justify-content: center; line-height: 1;
+        font-size: min(9.5vw, 58px);
+        transition: transform var(--dur, 600ms) cubic-bezier(.45,.05,.25,1), opacity 300ms;
+        z-index: 2; }
+  .pc.moving { z-index: 3; }
+  .pc.w { color: #fff; text-shadow: 0 0 1px #000, 0 0 1px #000, 0 0 1px #000, 0 2px 3px rgba(0,0,0,.4); }
+  .pc.b { color: #1a1a1a; text-shadow: 0 0 1px #000, 0 2px 3px rgba(0,0,0,.35); }
+  .pc.gone { opacity: 0; }
+  svg.arrows { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 4; pointer-events: none; }
+
+  .controls { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; align-items: center; }
+  button { font: inherit; padding: 9px 14px; border-radius: 8px; border: 1px solid var(--border);
+           background: var(--card); color: var(--fg); cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); min-width: 110px; }
+  label { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; margin-left: auto; }
+
+  .panel { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+  .comment { min-height: 110px; font-size: 15px; line-height: 1.5; }
+  .comment b { color: var(--accent); font-size: 18px; display: block; margin-bottom: 6px; }
+  .moves { margin-top: 14px; display: grid; grid-template-columns: 32px 1fr 1fr; gap: 2px 6px; font-size: 15px; }
+  .moves .n { color: var(--muted); }
+  .mv { padding: 3px 6px; border-radius: 5px; cursor: pointer; }
+  .mv:hover { background: rgba(138,75,31,.12); }
+  .mv.cur { background: var(--accent); color: #fff; }
+  .note { color: var(--muted); font-size: 13px; margin-top: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <h1>Шотландская партия</h1>
+    <p class="sub">1.e4 e5 2.Nf3 Nc6 3.d4 — вариант Мизеса, играем за белых</p>
+    <div class="board-box" id="board">
+      <div class="squares" id="squares"></div>
+      <div class="pieces" id="pieces"></div>
+      <svg class="arrows" id="arrows" viewBox="0 0 8 8">
+        <defs><marker id="ah" markerWidth="3" markerHeight="3" refX="1.6" refY="1.5" orient="auto">
+          <path d="M0,0 L3,1.5 L0,3 z" fill="rgba(20,120,60,.85)"/></marker></defs>
+      </svg>
+    </div>
+    <div class="controls">
+      <button id="reset" title="В начало">⏮</button>
+      <button id="prev" title="Назад">◀</button>
+      <button id="play" class="primary">▶ Играть</button>
+      <button id="next" title="Вперёд">▶</button>
+      <label>Скорость
+        <select id="speed">
+          <option value="2600">медленно</option>
+          <option value="1700" selected>норм</option>
+          <option value="900">быстро</option>
+        </select>
+      </label>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="comment" id="comment"></div>
+    <div class="moves" id="moves"></div>
+    <p class="note">Клик по ходу — перейти к позиции. Стрелки ← → на клавиатуре тоже работают.</p>
+  </div>
+</div>
+
+<script>
+const GLYPH = { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" };
+const START = [
+  "rnbqkbnr", "pppppppp", "........", "........",
+  "........", "........", "PPPPPPPP", "RNBQKBNR"
+];
+
+// Ходы: SAN, откуда, куда, комментарий
+const LINE = [
+  ["e4",   "e2","e4", "Белые сразу занимают центр королевской пешкой и открывают диагонали для ферзя и слона."],
+  ["e5",   "e7","e5", "Чёрные отвечают симметрично — классическое открытое начало."],
+  ["Nf3",  "g1","f3", "Конь развивается с темпом: атакует пешку e5."],
+  ["Nc6",  "b8","c6", "Самая естественная защита пешки e5 с развитием."],
+  ["d4",   "d2","d4", "Вот она — шотландская партия! Белые сразу вскрывают центр, не давая чёрным спокойно развиться (в отличие от испанской или итальянской)."],
+  ["exd4", "e5","d4", "Чёрные берут — держать центр пешкой e5 уже не получится."],
+  ["Nxd4", "f3","d4", "Белые отыгрывают пешку конём и получают свободную игру и пространство в центре."],
+  ["Nf6",  "g8","f6", "Самый популярный ответ: чёрные атакуют пешку e4 и развивают фигуру."],
+  ["Nxc6", "d4","c6", "Начинается вариант Мизеса: белые меняются на c6, чтобы испортить чёрным пешечную структуру."],
+  ["bxc6", "b7","c6", "Чёрные берут к центру. Пешки сдвоены, зато открыта линия «b»."],
+  ["e5",   "e4","e5", "Темп! Пешка гонит коня f6 и отбирает у чёрных поля d6 и f6."],
+  ["Qe7",  "d8","e7", "Чёрные связывают пешку e5 и сразу давят на неё."],
+  ["Qe2",  "d1","e2", "Ферзь защищает пешку и встаёт напротив ферзя соперника."],
+  ["Nd5",  "f6","d5", "Конь уходит в центр — красивое, но шаткое поле."],
+  ["c4",   "c2","c4", "Белые продолжают гнать коня и забирают ещё больше пространства."],
+  ["Ba6",  "c8","a6", "Хитрость: слон связывает пешку c4 с ферзём e2, конь d5 пока в безопасности."],
+  ["b3",   "b2","b3", "Белые укрепляют пешку c4 и готовят Bb2. Главная позиция варианта Мизеса: у белых пространство и лучшая структура, у чёрных — активные фигуры."]
+];
+
+const files = "abcdefgh";
+const sqIdx = s => ({ f: files.indexOf(s[0]), r: 8 - Number(s[1]) });
+const $ = id => document.getElementById(id);
+
+// Построить клетки
+for (let r = 0; r < 8; r++) for (let f = 0; f < 8; f++) {
+  const d = document.createElement("div");
+  d.className = "sq " + ((r + f) % 2 ? "d" : "l");
+  d.id = "sq-" + files[f] + (8 - r);
+  if (r === 7) d.innerHTML += `<span class="coord f">${files[f]}</span>`;
+  if (f === 0) d.innerHTML += `<span class="coord r">${8 - r}</span>`;
+  $("squares").appendChild(d);
+}
+
+// Список ходов
+for (let i = 0; i < LINE.length; i += 2) {
+  $("moves").insertAdjacentHTML("beforeend",
+    `<span class="n">${i / 2 + 1}.</span>` +
+    `<span class="mv" data-i="${i + 1}">${LINE[i][0]}</span>` +
+    (LINE[i + 1] ? `<span class="mv" data-i="${i + 2}">${LINE[i + 1][0]}</span>` : "<span></span>"));
+}
+
+let pieces = [];  // {el, f, r, alive}
+let ply = 0, timer = null;
+
+function place(p) { p.el.style.transform = `translate(${p.f * 100}%, ${p.r * 100}%)`; }
+
+function setup() {
+  $("pieces").innerHTML = "";
+  pieces = [];
+  START.forEach((row, r) => [...row].forEach((ch, f) => {
+    if (ch === ".") return;
+    const el = document.createElement("div");
+    const white = ch === ch.toUpperCase();
+    el.className = "pc " + (white ? "w" : "b");
+    el.textContent = GLYPH[ch.toLowerCase()] + "︎";
+    const p = { el, f, r, alive: true };
+    place(p);
+    $("pieces").appendChild(el);
+    pieces.push(p);
+  }));
+}
+
+function at(f, r) { return pieces.find(p => p.alive && p.f === f && p.r === r); }
+
+function apply(i) {
+  const [, from, to] = LINE[i];
+  const a = sqIdx(from), b = sqIdx(to);
+  const victim = at(b.f, b.r);
+  if (victim) { victim.alive = false; setTimeout(() => victim.el.classList.add("gone"), 250); }
+  const p = at(a.f, a.r);
+  p.f = b.f; p.r = b.r;
+  pieces.forEach(x => x.el.classList.remove("moving"));
+  p.el.classList.add("moving");
+  place(p);
+}
+
+function ui() {
+  document.querySelectorAll(".sq.hl").forEach(s => s.classList.remove("hl"));
+  document.querySelectorAll(".mv").forEach(m => m.classList.toggle("cur", +m.dataset.i === ply));
+  const svg = $("arrows");
+  svg.querySelectorAll("line").forEach(l => l.remove());
+  if (ply === 0) {
+    $("comment").innerHTML = "<b>Начальная позиция</b>Жми «Играть» — посмотрим, как белые разыгрывают шотландскую партию.";
+    return;
+  }
+  const [san, from, to, txt] = LINE[ply - 1];
+  $("sq-" + from).classList.add("hl"); $("sq-" + to).classList.add("hl");
+  const n = Math.ceil(ply / 2), w = ply % 2 === 1;
+  $("comment").innerHTML = `<b>${n}.${w ? "" : ".."} ${san}</b>${txt}`;
+  if (w) {   // стрелка только для ходов белых — мы играем за них
+    const a = sqIdx(from), b = sqIdx(to);
+    const x1 = a.f + .5, y1 = a.r + .5, x2 = b.f + .5, y2 = b.r + .5;
+    const len = Math.hypot(x2 - x1, y2 - y1), k = (len - .35) / len;
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    Object.entries({ x1, y1, x2: x1 + (x2 - x1) * k, y2: y1 + (y2 - y1) * k,
+      stroke: "rgba(20,120,60,.7)", "stroke-width": .16, "stroke-linecap": "round",
+      "marker-end": "url(#ah)" }).forEach(([k2, v]) => line.setAttribute(k2, v));
+    svg.appendChild(line);
+  }
+}
+
+function goto(target) {
+  // мгновенный переход без анимации
+  document.documentElement.style.setProperty("--dur", "0ms");
+  setup();
+  for (let i = 0; i < target; i++) apply(i);
+  pieces.forEach(p => { if (!p.alive) p.el.classList.add("gone"); });
+  ply = target; ui();
+  requestAnimationFrame(() => requestAnimationFrame(() =>
+    document.documentElement.style.setProperty("--dur", "600ms")));
+}
+
+function next() {
+  if (ply >= LINE.length) { stop(); return false; }
+  apply(ply); ply++; ui();
+  return true;
+}
+
+function stop() { clearInterval(timer); timer = null; $("play").textContent = "▶ Играть"; }
+function play() {
+  if (ply >= LINE.length) goto(0);
+  $("play").textContent = "⏸ Пауза";
+  next();
+  timer = setInterval(() => { if (!next()) stop(); }, +$("speed").value);
+}
+
+$("play").onclick = () => timer ? stop() : play();
+$("next").onclick = () => { stop(); next(); };
+$("prev").onclick = () => { stop(); if (ply > 0) goto(ply - 1); };
+$("reset").onclick = () => { stop(); goto(0); };
+$("speed").onchange = () => { if (timer) { stop(); play(); } };
+$("moves").onclick = e => { const i = e.target.dataset.i; if (i) { stop(); goto(+i); } };
+document.addEventListener("keydown", e => {
+  if (e.key === "ArrowRight") $("next").click();
+  if (e.key === "ArrowLeft") $("prev").click();
+  if (e.key === " ") { e.preventDefault(); $("play").click(); }
+});
+
+setup(); ui();
+</script>
+</body>
+</html>
